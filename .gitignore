@@ -12,6 +12,9 @@ venv/
 # Dependencies
 node_modules/
 
+# Uploads
+uploads/
+
 # Next.js
 .next/
 out/
