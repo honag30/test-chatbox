@@ -9,6 +9,7 @@ class ChatService:
         self.memory = ChatMemory()
         self.ai = AIService()
         self.doc_service = DocumentService()
+        self.last_doc_result: dict | None = None  # Lưu kết quả trích xuất tài liệu gần nhất
 
     def send_message(self, message: str) -> str:
         """
@@ -63,6 +64,9 @@ class ChatService:
         self.memory.add_user_message(f"{context_prompt}\n\n{user_req_text}")
         self.memory.add_assistant_message(summary)
 
+        # Lưu doc_result để các endpoint khác có thể truy cập
+        self.last_doc_result = doc_result
+
         return summary, doc_result
 
     def clear_history(self):
@@ -70,3 +74,4 @@ class ChatService:
         Xóa toàn bộ lịch sử hội thoại và ngữ cảnh tài liệu hiện tại trong RAM.
         """
         self.memory.clear()
+        self.last_doc_result = None

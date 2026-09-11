@@ -111,7 +111,7 @@ export default function Sidebar({
             <span>Tài liệu mẫu & Đã tải lên ({filesList.length})</span>
           </div>
 
-          <div style={{ flex: 1, overflowY: 'auto', maxHeight: '380px' }}>
+          <div style={{ flex: 1, overflowY: 'auto',overflowX: "hidden", paddingRight: "5px", maxHeight: '500px' }}>
             {filesList.length === 0 ? (
               <div style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.75rem', padding: '20px' }}>
                 Đang quét danh sách file...

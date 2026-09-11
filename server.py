@@ -8,8 +8,9 @@ if hasattr(sys.stdout, 'reconfigure'):
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 from typing import Optional
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from chat_service import ChatService
@@ -30,6 +31,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Đảm bảo mọi lỗi không xử lý đều trả về JSON thay vì HTML."""
+    import traceback
+    tb = traceback.format_exc()
+    print(f"[GlobalExceptionHandler] Lỗi không xử lý trên {request.url}:\n{tb}")
+    return JSONResponse(
+        status_code=500,
+        content={"status": "error", "detail": str(exc)}
+    )
 
 # Khởi tạo singleton ChatService cho phiên làm việc
 chat_service = ChatService()
@@ -64,6 +77,18 @@ def clear_history():
         "status": "success",
         "message": "Đã xóa toàn bộ lịch sử và ngữ cảnh tài liệu."
     }
+
+
+@app.get("/api/doc-result")
+def get_doc_result():
+    """
+    Trả về doc_result (bao gồm pages với elements) của tài liệu đang được đối thoại.
+    Frontend dùng để render văn bản gốc có cấu trúc ngay trong chat.
+    """
+    if chat_service.last_doc_result is None:
+        return {"status": "empty", "doc_result": None}
+    return {"status": "success", "doc_result": chat_service.last_doc_result}
+
 
 
 @app.post("/api/chat")
@@ -185,4 +210,4 @@ def list_available_files():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("server:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("server:app", host="127.0.0.1", port=8000, reload=True, timeout_keep_alive=120)

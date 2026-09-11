@@ -4,6 +4,21 @@ import ChatArea from './components/ChatArea';
 import DropZone from './components/DropZone';
 import DocInspector from './components/DocInspector';
 
+/**
+ * Đọc JSON từ response một cách an toàn.
+ * Trả về null nếu response rỗng hoặc không phải JSON hợp lệ.
+ */
+async function safeJson(res) {
+  const text = await res.text();
+  if (!text || text.trim() === '') return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    console.error('Không thể parse JSON từ server:', text.slice(0, 300));
+    return null;
+  }
+}
+
 export default function App() {
   const [messages, setMessages] = useState([]);
   const [filesList, setFilesList] = useState([]);
@@ -69,7 +84,8 @@ export default function App() {
         body: JSON.stringify({ message: text }),
       });
 
-      const data = await res.json();
+      const data = await safeJson(res);
+      if (!data) throw new Error(`Server trả về phản hồi không hợp lệ (HTTP ${res.status})`);
       if (!res.ok) throw new Error(data.detail || 'Lỗi từ server');
 
       const aiMsg = {
@@ -103,12 +119,22 @@ export default function App() {
     }
 
     try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 phút timeout
 
-      const data = await res.json();
+      let res;
+      try {
+        res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      const data = await safeJson(res);
+      if (!data) throw new Error(`Server trả về phản hồi không hợp lệ (HTTP ${res.status}). Có thể file quá lớn hoặc OCR thất bại.`);
       if (!res.ok) throw new Error(data.detail || 'Lỗi khi upload file');
 
       setActiveDoc(data.doc_result);
@@ -147,13 +173,23 @@ export default function App() {
     setIsUploading(true);
 
     try {
-      const res = await fetch('/api/select-file', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file_path: filePath }),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 phút timeout
 
-      const data = await res.json();
+      let res;
+      try {
+        res = await fetch('/api/select-file', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file_path: filePath }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      const data = await safeJson(res);
+      if (!data) throw new Error(`Server trả về phản hồi không hợp lệ (HTTP ${res.status}). Có thể OCR thất bại hoặc file không hợp lệ.`);
       if (!res.ok) throw new Error(data.detail || 'Lỗi khi đọc file');
 
       setActiveDoc(data.doc_result);

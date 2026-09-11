@@ -1,7 +1,71 @@
 import React, { useState } from 'react';
-import { X, Table, FileText, Cpu, CheckCircle2, Layers } from 'lucide-react';
+import { X, Table, FileText, Cpu, CheckCircle2, Layers, AlignLeft } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+
+/**
+ * Render một element văn bản theo type (heading | list | paragraph | table)
+ * để bảo toàn format tương đối gần bản gốc.
+ */
+function DocElement({ el, idx }) {
+  if (!el || !el.text) return null;
+
+  if (el.type === 'heading') {
+    return (
+      <div key={idx} style={{
+        fontWeight: 700,
+        fontSize: '0.82rem',
+        color: '#f1f5f9',
+        letterSpacing: '0.03em',
+        marginTop: '14px',
+        marginBottom: '4px',
+        textAlign: 'center',
+        lineHeight: 1.5,
+      }}>
+        {el.text}
+      </div>
+    );
+  }
+
+  if (el.type === 'list') {
+    return (
+      <div key={idx} style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '8px',
+        paddingLeft: '16px',
+        marginBottom: '3px',
+        lineHeight: 1.65,
+      }}>
+        <span style={{ color: 'var(--accent-cyan)', flexShrink: 0, marginTop: '2px', fontSize: '0.7rem' }}>•</span>
+        <span style={{ fontSize: '0.775rem', color: '#cbd5e1' }}>{el.text.replace(/^[•\-\*\+]\s+/, '').replace(/^\d+\.\d+(\.\d+)?\s+/, '').replace(/^[a-z]\)\s+/, '')}</span>
+      </div>
+    );
+  }
+
+  if (el.type === 'table') {
+    // Hiển thị bảng đơn giản nếu element là table inline
+    return (
+      <div key={idx} style={{ margin: '8px 0', fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic' }}>
+        [Bảng — xem chi tiết ở tab Bảng biểu]
+      </div>
+    );
+  }
+
+  // paragraph (default)
+  return (
+    <div key={idx} style={{
+      fontSize: '0.775rem',
+      color: '#cbd5e1',
+      lineHeight: 1.75,
+      marginBottom: '2px',
+      textAlign: 'justify',
+      wordBreak: 'break-word',
+    }}>
+      {el.text}
+    </div>
+  );
+}
 
 export default function DocInspector({ docResult, onClose }) {
   if (!docResult) return null;
@@ -59,7 +123,7 @@ export default function DocInspector({ docResult, onClose }) {
           }}
         >
           <FileText size={14} />
-          <span>Text trích xuất</span>
+          <span>Văn bản gốc</span>
         </button>
 
         <button 
@@ -108,25 +172,98 @@ export default function DocInspector({ docResult, onClose }) {
           </div>
         )}
 
-        {/* TAB 2: RAW TEXT */}
-        {activeTab === 'raw' && (
-          <div>
-            <div style={{ 
-              background: 'rgba(0, 0, 0, 0.4)', 
-              padding: '14px', 
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border-glass)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '0.75rem',
-              color: '#cbd5e1',
-              whiteSpace: 'pre-wrap',
-              maxHeight: '600px',
-              overflowY: 'auto'
-            }}>
-              {docResult.full_text || '(Không có text nào được trích xuất)'}
+
+        {/* TAB 2: FULL TEXT CÓ CẤU TRÚC */}
+        {activeTab === 'raw' && (() => {
+          const pages = docResult.pages || [];
+          const hasStructuredPages = pages.length > 0 && pages.some(p => p.elements && p.elements.length > 0);
+
+          if (!hasStructuredPages) {
+            // Fallback: hiển thị full_text với pre-wrap nếu không có structured data
+            return (
+              <div>
+                <div style={{
+                  background: 'rgba(0, 0, 0, 0.4)',
+                  padding: '14px',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-glass)',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '0.75rem',
+                  color: '#cbd5e1',
+                  whiteSpace: 'pre-wrap',
+                  maxHeight: '600px',
+                  overflowY: 'auto'
+                }}>
+                  {docResult.full_text || '(Không có text nào được trích xuất)'}
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+              {pages.map((page, pageIdx) => {
+                const elements = page.elements || [];
+                const methodLabel = page.method === 'ocr'
+                  ? `OCR${page.confidence != null ? ` (${page.confidence}%)` : ''}`
+                  : 'Native Text';
+
+                return (
+                  <div key={pageIdx} style={{ marginBottom: '20px' }}>
+                    {/* Page header divider */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: '10px',
+                      paddingBottom: '6px',
+                      borderBottom: '1px solid var(--border-glass)',
+                    }}>
+                      <span style={{
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        color: 'var(--accent-cyan)',
+                        background: 'rgba(56,189,248,0.10)',
+                        borderRadius: '4px',
+                        padding: '2px 8px',
+                        letterSpacing: '0.04em',
+                      }}>
+                        Trang {page.page}
+                      </span>
+                      <span style={{
+                        fontSize: '0.65rem',
+                        color: 'var(--text-dim)',
+                        fontStyle: 'italic',
+                      }}>
+                        {methodLabel}
+                      </span>
+                    </div>
+
+                    {/* Document body — styled to match original layout */}
+                    <div style={{
+                      background: 'rgba(248, 250, 252, 0.03)',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-glass)',
+                      padding: '18px 20px',
+                      fontFamily: "'Times New Roman', 'Georgia', serif",
+                    }}>
+                      {elements.length === 0 ? (
+                        <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem', fontStyle: 'italic' }}>
+                          (Không có nội dung trên trang này)
+                        </div>
+                      ) : (
+                        elements.map((el, elIdx) => (
+                          <DocElement key={elIdx} el={el} idx={elIdx} />
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          </div>
-        )}
+          );
+        })()}
+
 
         {/* TAB 3: META INFO */}
         {activeTab === 'meta' && (
